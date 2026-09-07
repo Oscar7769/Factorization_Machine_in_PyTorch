@@ -28,7 +28,7 @@ conda create -n <env_name> python=3.9.23 -y
 ```
 ### Activate environment
 ```bash
-conda activate mp
+conda activate <env_name>
 ```
 ### Install PyTorch (CUDA 12.4)
 ```bash
