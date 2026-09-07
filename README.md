@@ -24,7 +24,7 @@ Create a clean environment with the specific Python version.
 
 ### Create environment
 ```bash
-conda create -n photonics python=3.9.23 -y
+conda create -n <env_name> python=3.9.23 -y
 ```
 ### Activate environment
 ```bash
