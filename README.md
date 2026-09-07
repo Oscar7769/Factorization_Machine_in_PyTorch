@@ -1,4 +1,4 @@
-# PyTorch Factorization Machine
+# Factorization Machine 測試：使用 PyTorch 建構與訓練 BQM 能量模型
 
 ## Version Requirements
 
