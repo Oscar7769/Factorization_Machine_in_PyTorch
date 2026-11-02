@@ -33,16 +33,7 @@
 
 專案使用的 FM 預測能量函數如下：
 
-$$
-\hat{E}(\mathbf{x})
-=
-b
-+
-\sum_{i=1}^{n} h_i x_i
-+
-\sum_{i=1}^{n}\sum_{j=i+1}^{n}
-\mathbf{v}_i^{\mathsf{T}}\mathbf{v}_j x_i x_j
-$$
+$\hat{E}(\mathbf{x}) = b + \sum_{i=1}^{n} h_i x_i + \sum_{i=1}^{n}\sum_{j=i+1}^{n} \mathbf{v}_i^T \mathbf{v}_j x_i x_j$
 
 其中：
 
@@ -67,14 +58,7 @@ $$
 
 其二次交互作用項可利用下式高效率計算：
 
-$$
-\frac{1}{2}\sum_{f=1}^{k}
-\left[
-\left(\sum_{i=1}^{n}v_{if}x_i\right)^2
--
-\sum_{i=1}^{n}v_{if}^{\,2}x_i^2
-\right]
-$$
+$\frac{1}{2}\sum_{f=1}^{k} [(\sum_{i=1}^{n}v_{if}x_i)^2 - \sum_{i=1}^{n}v_{if}^2x_i^2]$
 
 因此，前向傳播的計算複雜度可由 $O(n^2)$ 降低為 $O(nk)$，其中 $n$ 為輸入變數數量，$k$ 為因子分解維度。
 
@@ -84,15 +68,7 @@ $$
 
 BQM 的能量函數表示如下：
 
-$$
-E(\mathbf{x})
-=
-b
-+
-\sum_i h_i x_i
-+
-\sum_{i=1}^{n}\sum_{j=i+1}^{n}Q_{ij}x_ix_j
-$$
+$E(\mathbf{x}) = b + \sum_{i=1}^{n} h_i x_i + \sum_{i=1}^{n}\sum_{j=i+1}^{n} Q_{ij}x_ix_j$
 
 訓練完成後，FM 的參數可轉換為對應的 BQM 係數：
 
