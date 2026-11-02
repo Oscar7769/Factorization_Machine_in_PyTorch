@@ -4,173 +4,195 @@
   <img src="https://img.shields.io/badge/dimod-0.12.20-6B7280" alt="dimod 0.12.20">
 </p>
 
-<h1 align="center">Factorization Machine for Binary Quadratic Models</h1>
+<h1 align="center">以 PyTorch 實作的 Factorization Machine：BQM 能量模型學習</h1>
 
 <p align="center">
-  A PyTorch implementation of a second-order Factorization Machine for learning
-  and reconstructing Binary Quadratic Models (BQMs).
+  使用二階 Factorization Machine 學習 Binary Quadratic Model，並由訓練後的模型參數還原二次交互作用係數。
 </p>
 
 ---
 
-## Overview
+## 專案簡介
 
-This repository implements a second-order **Factorization Machine (FM)** in PyTorch and demonstrates how it can be trained as an energy surrogate for a **Binary Quadratic Model (BQM)**.
+本專案使用 **PyTorch** 實作二階 **Factorization Machine（FM）**，並展示如何將 FM 作為 **Binary Quadratic Model（BQM）** 的能量近似模型（energy surrogate）。
 
-The main experiment generates a fully connected binary BQM, samples binary configurations, and evaluates their exact energies. A neural FM is then trained to approximate the energy function. After training, its parameters are converted back into the corresponding BQM coefficients for evaluation and comparison.
+實驗首先產生一個具有二元變數的隨機 BQM，再隨機取樣多組二元組態，並透過 `dimod` 計算各組態的參考能量。接著使用 PyTorch 訓練 FM，使模型預測值逼近 BQM 的能量。完成訓練後，再從 FM 參數取回偏置、線性項與二次交互作用係數，重建等效的 BQM，並比較預測能量與參考能量。
 
-The implementation is intended for experiments involving quadratic energy modeling and the connection between factorized interaction models and BQMs.
+本專案主要展示以下流程：
 
-## Model Formulation
+- 使用 PyTorch 建立及訓練二階 Factorization Machine。
+- 以 FM 的因子分解矩陣表示變數之間的二次交互作用。
+- 將訓練後的 FM 參數轉換成 BQM 係數。
+- 使用 `dimod` 重建 BQM，並評估能量預測結果。
 
-For a binary input vector \(x \in \{0,1\}^{n}\), the second-order Factorization Machine is defined as
+## 數學模型
 
-\[
-\hat{E}(x)
+### Factorization Machine
+
+對於輸入二元向量 $\mathbf{x}\in\{0,1\}^{n}$，二階 Factorization Machine 的預測能量可表示為：
+
+$$
+\hat{E}(\mathbf{x})
 =
 b
 +
 \sum_{i=1}^{n} h_i x_i
 +
 \sum_{i<j}
-\langle v_i,v_j\rangle x_i x_j ,
-\]
+\langle \mathbf{v}_i,\mathbf{v}_j\rangle x_i x_j
+$$
 
-where:
+其中：
 
-- \(b\) is the scalar offset.
-- \(h_i\) is the linear coefficient associated with variable \(i\).
-- \(v_i \in \mathbb{R}^{k}\) is the latent factor vector for variable \(i\).
-- \(k\) is the factorization rank.
+- $b$：偏置項（offset）。
+- $h_i$：第 $i$ 個變數的線性係數。
+- $\mathbf{v}_i\in\mathbb{R}^{k}$：第 $i$ 個變數對應的潛在因子向量。
+- $k$：因子分解維度（factorization rank）。
+- $\langle \mathbf{v}_i,\mathbf{v}_j\rangle$：變數 $i$ 與 $j$ 之間的二次交互作用係數。
 
-The pairwise interaction coefficients are represented through the factorization
+FM 不需要直接為每一組變數交互作用獨立配置參數，而是透過因子矩陣 $V$ 表示交互作用：
 
-\[
-Q_{ij} = \langle v_i,v_j\rangle,\qquad i<j.
-\]
+$$
+Q_{ij}=\langle \mathbf{v}_i,\mathbf{v}_j\rangle,
+\qquad i<j
+$$
 
-Instead of learning every pairwise coefficient independently, the model learns a low-rank factor matrix \(V\). Its interaction term is evaluated efficiently using
+### 二次交互作用的高效率計算
 
-\[
+若直接計算所有變數配對，二次交互作用的計算量會隨變數數量呈平方成長。FM 利用平方和恆等式，將二次交互作用改寫為：
+
+$$
 \frac{1}{2}\sum_{f=1}^{k}
 \left[
 \left(\sum_{i=1}^{n}v_{if}x_i\right)^2
 -
 \sum_{i=1}^{n}v_{if}^{\,2}x_i^2
-\right].
-\]
+\right]
+$$
 
-This reduces the interaction evaluation cost from \(O(n^2)\) to \(O(nk)\).
+因此，前向傳播的計算複雜度可由 $O(n^2)$ 降低為 $O(nk)$，其中 $n$ 為輸入變數數量，$k$ 為因子分解維度。
 
-For binary variables, the trained parameters can be mapped to a BQM:
+### 從 FM 參數還原 BQM
 
-\[
-E(x)=b+\sum_i h_i x_i+\sum_{i<j}Q_{ij}x_ix_j.
-\]
+對於二元變數 $x_i\in\{0,1\}$，BQM 的能量函數可寫成：
 
-The implementation extracts the upper-triangular interaction coefficients from \(V^\mathsf{T}V\), excluding the diagonal self-interactions.
+$$
+E(\mathbf{x})
+=
+b
++
+\sum_i h_i x_i
++
+\sum_{i<j}Q_{ij}x_ix_j
+$$
 
-## Workflow
+訓練完成後，FM 的參數可轉換為對應的 BQM 係數：
 
-The main notebook follows this pipeline:
+- 偏置項：$b$。
+- 線性係數：$h$。
+- 二次係數：由 $V^\mathsf{T}V$ 取得，並僅保留上三角矩陣中不含對角線的元素。
+
+程式中的 `get_bhQ()` 會回傳上述參數。由於對角線代表變數自身的平方項，而本實作只保留不同變數之間的交互作用，因此會排除矩陣對角線。
+
+## 實驗流程
+
+主要實驗 Notebook 的執行流程如下：
 
 ~~~mermaid
 flowchart TD
-    A["Generate a random BQM"] --> B["Sample binary configurations"]
-    B --> C["Evaluate reference BQM energies"]
-    C --> D["Train the PyTorch Factorization Machine"]
-    D --> E["Extract offset, linear, and quadratic coefficients"]
-    E --> F["Reconstruct a BQM with dimod"]
-    F --> G["Compare predicted and reference energies"]
-    E --> H["Visualize the learned interaction matrix"]
+    A["產生隨機 BQM"] --> B["取樣二元變數組態"]
+    B --> C["計算 BQM 參考能量"]
+    C --> D["使用 PyTorch 訓練 Factorization Machine"]
+    D --> E["擷取偏置、線性與二次係數"]
+    E --> F["使用 dimod 重建 BQM"]
+    F --> G["比較預測能量與參考能量"]
+    E --> H["繪製二次交互作用矩陣"]
 ~~~
 
-## Repository Structure
+## 專案結構
 
-| File / Directory | Description |
+| 檔案／資料夾 | 說明 |
 | :--- | :--- |
-| [factorization_machine.py](factorization_machine.py) | PyTorch implementation of the Factorization Machine and parameter extraction utilities. |
-| [BQM Factorization Machine.ipynb](BQM%20Factorization%20Machine.ipynb) | Main experiment: BQM generation, dataset construction, model training, coefficient extraction, and evaluation. |
-| [test_demo_1.ipynb](test_demo_1.ipynb) | Earlier demonstration and experimental notebook. |
-| `data/` | Generated training/test datasets and initial model parameters. Created when the main notebook is executed. |
-| `results/` | Generated Q-matrix visualization and prediction data. Created during the experiment. |
+| [factorization_machine.py](factorization_machine.py) | Factorization Machine 模型、前向傳播，以及參數擷取函式。 |
+| [BQM Factorization Machine.ipynb](BQM%20Factorization%20Machine.ipynb) | 主要實驗：產生 BQM、建立資料集、訓練模型、擷取係數及評估預測結果。 |
+| [test_demo_1.ipynb](test_demo_1.ipynb) | 初期模型測試與 BQM 轉換示範。 |
+| `data/` | 執行主要 Notebook 後產生的訓練／測試資料集與模型初始參數。 |
+| `results/` | 儲存訓練後的交互作用矩陣圖與能量預測資料。 |
 
-## Environment
+## 環境需求
 
-The experiment was developed with the following package versions.
+本專案使用以下套件版本：
 
-| Package | Version | Installation source |
-| :--- | :--- | :--- |
-| Python | `3.9.23` | Conda |
-| PyTorch | `2.6.0+cu124` | PyTorch CUDA 12.4 wheel |
-| NumPy | `2.0.2` | pip |
-| Matplotlib | `3.9.4` | pip |
-| JupyterLab | `4.4.4` | pip |
-| dimod | `0.12.20` | pip |
+| 套件 | 版本 | 安裝來源 | 用途 |
+| :--- | :--- | :--- | :--- |
+| Python | `3.9.23` | Conda | Python 執行環境 |
+| PyTorch | `2.6.0+cu124` | pip | 深度學習與模型訓練（CUDA 12.4） |
+| NumPy | `2.0.2` | pip | 數值運算 |
+| Matplotlib | `3.9.4` | pip | 結果視覺化 |
+| JupyterLab | `4.4.4` | pip | 執行 Notebook |
+| dimod | `0.12.20` | pip | BQM 建立、能量計算與模型重建 |
 
-## Installation
+## 安裝方式
 
-Create and activate a dedicated Conda environment:
+### 1. 建立並啟用 Conda 環境
 
 ~~~bash
 conda create -n fm-bqm python=3.9.23 -y
 conda activate fm-bqm
 ~~~
 
-Install PyTorch with CUDA 12.4 support:
+### 2. 安裝 PyTorch（CUDA 12.4）
 
 ~~~bash
 pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124
 ~~~
 
-Install the remaining dependencies:
+### 3. 安裝其餘套件
 
 ~~~bash
 pip install numpy==2.0.2 matplotlib==3.9.4 jupyterlab==4.4.4 dimod==0.12.20
 ~~~
 
-The training notebook automatically selects CUDA when available and otherwise falls back to CPU. The CUDA-enabled PyTorch installation requires a compatible NVIDIA driver and GPU environment.
+Notebook 會自動檢查 CUDA 是否可用：若環境支援 CUDA，便使用 GPU 訓練；否則會自動改用 CPU。若要使用 GPU，仍須具備相容的 NVIDIA GPU 與驅動程式。
 
-## Running the Experiment
+## 執行實驗
 
-Launch JupyterLab from the repository directory:
+在專案根目錄啟動 JupyterLab：
 
 ~~~bash
 jupyter lab
 ~~~
 
-Open **BQM Factorization Machine.ipynb** and execute its cells in order.
+開啟 **BQM Factorization Machine.ipynb**，並依照 Notebook 中的順序執行各個儲存格。主要步驟如下：
 
-The notebook performs the following steps:
+1. 產生具有 32 個二元變數的隨機 BQM。
+2. 隨機產生訓練與測試組態，並使用 `dimod` 計算對應能量。
+3. 儲存資料集與 FM 模型初始參數。
+4. 使用 Mean Squared Error（MSE）作為損失函數，並透過 Adam optimizer 訓練模型。
+5. 從訓練後的模型擷取偏置、線性係數與二次交互作用係數。
+6. 使用擷取出的係數重建 BQM，並比較測試資料的預測能量與參考能量。
 
-1. Generates a random, fully connected BQM with binary variables.
-2. Samples configurations and evaluates their reference energies using dimod.
-3. Saves the training/test datasets and initial FM parameters.
-4. Trains the PyTorch model using mean squared error and the Adam optimizer.
-5. Extracts the learned offset, linear coefficients, and quadratic interactions.
-6. Reconstructs a BQM and compares its predicted energies with the reference energies.
+## 主要實驗參數
 
-## Main Experiment Configuration
+主要 Notebook 預設使用以下設定：
 
-The default configuration in the main notebook is:
-
-| Parameter | Value |
+| 參數 | 數值 |
 | :--- | :---: |
-| Number of binary variables | 32 |
-| Factorization rank | 32 |
-| Training samples | 10,000 |
-| Test samples | 50,000 |
-| Training epochs | 1,000 |
-| Batch size | 512 |
+| 二元變數數量（VAR_NUM） | 32 |
+| 因子分解維度（K） | 32 |
+| 訓練資料筆數（DATASET_SIZE） | 10,000 |
+| 測試資料筆數（TEST_NUM） | 50,000 |
+| 訓練 Epoch（NUM_EPOCH） | 1,000 |
+| Batch Size | 512 |
 | Optimizer | Adam |
-| Learning rate | `1e-3` |
-| Loss function | Mean Squared Error (MSE) |
+| Learning Rate | `1e-3` |
+| Loss Function | Mean Squared Error（MSE） |
 
-These values are experiment defaults and can be changed in the notebook.
+上述數值為 Notebook 的預設實驗參數，可依實際需求修改。
 
-## Using the Model
+## 模型使用範例
 
-The model can also be imported independently:
+除了執行完整 Notebook，也可以在 Python 程式中獨立呼叫模型：
 
 ~~~python
 import torch
@@ -182,49 +204,51 @@ model = FactorizationMachine(
     act="identity"
 )
 
-# A batch of binary configurations: (batch_size, input_size)
+# 建立一批二元輸入組態，尺寸為 (batch_size, input_size)
 x = torch.randint(0, 2, (16, 32)).float()
 
-# Predicted energies: (batch_size, 1)
+# 預測能量，輸出尺寸為 (batch_size, 1)
 predicted_energy = model(x)
 
-# Extract the equivalent BQM parameters
+# 擷取等效 BQM 參數
 offset, linear, Q_upper = model.get_bhQ()
 ~~~
 
-The parameter extraction method returns:
+`get_bhQ()` 回傳三項資料：
 
-- `offset`: scalar BQM offset.
-- `linear`: NumPy array containing the linear coefficients.
-- `Q_upper`: upper-triangular NumPy matrix containing pairwise interaction coefficients.
-
-For BQM reconstruction, the notebook uses `dimod.BinaryQuadraticModel` with the extracted offset, linear terms, and nonzero upper-triangular quadratic terms.
-
-## Generated Outputs
-
-After running the main notebook, the following files are generated:
-
-| Output | Description |
+| 回傳值 | 說明 |
 | :--- | :--- |
-| `data/xs_train.npy` | Binary training configurations. |
-| `data/ys_train.npy` | Reference energies for the training configurations. |
-| `data/xs_test.npy` | Binary test configurations. |
-| `data/ys_test.npy` | Reference energies for the test configurations. |
-| `data/initial_bias.npy` | Initial model offset. |
-| `data/initial_h.npy` | Initial linear parameters. |
-| `data/initial_V.npy` | Initial factorization matrix. |
-| `results/Q_matrix_pytorch.png` | Visualization of the learned symmetric interaction matrix. |
-| `results/ys_pred_pytorch.npy` | Predicted energies on the test set. |
-| `py_energy_comparison.png` | Comparison between reference and predicted test energies. |
+| `offset` | BQM 的偏置項（純量）。 |
+| `linear` | 儲存各變數線性係數的 NumPy 陣列。 |
+| `Q_upper` | 儲存二次交互作用係數的上三角 NumPy 矩陣，不包含對角線。 |
 
-## Scope and Reproducibility
+主要 Notebook 會將這些參數傳入 `dimod.BinaryQuadraticModel`，建立重建後的 BQM。
 
-This repository focuses on **training a Factorization Machine as a BQM energy surrogate and recovering its quadratic coefficients**. The current notebooks do not submit the reconstructed BQM to a quantum annealer or execute an annealing sampler.
+## 實驗輸出
 
-The main notebook declares `RANDOM_SEED = 42`, but does not currently apply it to the NumPy or PyTorch random number generators. Therefore, independently generated datasets and model initializations are not guaranteed to be identical across runs.
+執行主要 Notebook 後，會產生以下檔案：
+
+| 輸出檔案 | 說明 |
+| :--- | :--- |
+| `data/xs_train.npy` | 訓練用二元變數組態。 |
+| `data/ys_train.npy` | 訓練組態對應的 BQM 參考能量。 |
+| `data/xs_test.npy` | 測試用二元變數組態。 |
+| `data/ys_test.npy` | 測試組態對應的 BQM 參考能量。 |
+| `data/initial_bias.npy` | FM 初始偏置參數。 |
+| `data/initial_h.npy` | FM 初始線性參數。 |
+| `data/initial_V.npy` | FM 初始因子分解矩陣。 |
+| `results/Q_matrix_pytorch.png` | 訓練後的對稱二次交互作用矩陣視覺化結果。 |
+| `results/ys_pred_pytorch.npy` | 模型對測試資料的預測能量。 |
+| `py_energy_comparison.png` | 測試資料的參考能量與預測能量比較圖。 |
+
+## 實作範圍與可重現性
+
+本專案目前聚焦於 **使用 Factorization Machine 學習 BQM 能量函數，並由模型參數還原二次交互作用係數**。目前的 Notebook 並未將重建後的 BQM 提交至 D-Wave 量子退火器，也沒有執行量子退火取樣。
+
+另外，主要 Notebook 雖然宣告了 `RANDOM_SEED = 42`，但目前並未將此參數實際設定至 NumPy 或 PyTorch 的隨機數產生器。因此，不同次執行所產生的資料集與模型初始參數不保證完全相同。
 
 ---
 
 <p align="center">
-  <sub>PyTorch implementation for Factorization Machine-based binary quadratic energy modeling.</sub>
+  <sub>以 PyTorch 實作 Factorization Machine，進行二元二次能量模型的學習與重建。</sub>
 </p>
