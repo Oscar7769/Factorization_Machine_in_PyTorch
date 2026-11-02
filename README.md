@@ -33,16 +33,16 @@
 
 專案使用的 FM 預測能量函數如下：
 
-```math
+$$
 \hat{E}(\mathbf{x})
 =
 b
 +
 \sum_{i=1}^{n} h_i x_i
 +
-\sum_{i<j}
-\langle \mathbf{v}_i,\mathbf{v}_j\rangle x_i x_j
-```
+\sum_{i=1}^{n}\sum_{j=i+1}^{n}
+\mathbf{v}_i^{\mathsf{T}}\mathbf{v}_j x_i x_j
+$$
 
 其中：
 
@@ -50,16 +50,16 @@ b
 - $h_i$：第 $i$ 個變數的線性係數。
 - $\mathbf{v}_i\in\mathbb{R}^{k}$：第 $i$ 個變數對應的潛在因子向量。
 - $k$：因子分解維度（factorization rank）。
-- $\langle \mathbf{v}_i,\mathbf{v}_j\rangle$：變數 $i$ 與 $j$ 之間的二次交互作用係數。
+- $\mathbf{v}_i^{\mathsf{T}}\mathbf{v}_j$：變數 $i$ 與 $j$ 之間的二次交互作用係數。
 
 FM 不需要直接為每一組變數交互作用獨立配置參數，而是透過因子矩陣 $V$ 表示交互作用：
 
 其中，兩個不同變數之間的二次交互作用係數為：
 
-```math
-Q_{ij}=\langle \mathbf{v}_i,\mathbf{v}_j\rangle,
-\qquad i<j
-```
+$$
+Q_{ij}=\mathbf{v}_i^{\mathsf{T}}\mathbf{v}_j,
+\quad j=i+1,\ldots,n,\quad i=1,\ldots,n-1
+$$
 
 ### 二次交互作用的高效率計算
 
@@ -67,14 +67,14 @@ Q_{ij}=\langle \mathbf{v}_i,\mathbf{v}_j\rangle,
 
 其二次交互作用項可利用下式高效率計算：
 
-```math
+$$
 \frac{1}{2}\sum_{f=1}^{k}
 \left[
 \left(\sum_{i=1}^{n}v_{if}x_i\right)^2
 -
 \sum_{i=1}^{n}v_{if}^{\,2}x_i^2
 \right]
-```
+$$
 
 因此，前向傳播的計算複雜度可由 $O(n^2)$ 降低為 $O(nk)$，其中 $n$ 為輸入變數數量，$k$ 為因子分解維度。
 
@@ -84,15 +84,15 @@ Q_{ij}=\langle \mathbf{v}_i,\mathbf{v}_j\rangle,
 
 BQM 的能量函數表示如下：
 
-```math
+$$
 E(\mathbf{x})
 =
 b
 +
 \sum_i h_i x_i
 +
-\sum_{i<j}Q_{ij}x_ix_j
-```
+\sum_{i=1}^{n}\sum_{j=i+1}^{n}Q_{ij}x_ix_j
+$$
 
 訓練完成後，FM 的參數可轉換為對應的 BQM 係數：
 
